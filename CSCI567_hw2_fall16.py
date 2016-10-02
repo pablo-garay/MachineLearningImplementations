@@ -105,27 +105,38 @@ def pearsonr(x, y):
   if den == 0: return 0
   return num / den
 
+pearson_correlations = []
+
 # Find Pearson correlation of each attr with target value
 for attribute in range(trainset_x.shape[1]):
+    pearson_correlation = pearsonr(trainset_x[:, attribute], trainset_y)
     print("Pearson correlation of attribute %d with target value" % (attribute + 1))
-    print(pearsonr(trainset_x[:, attribute], trainset_y))
+    print(pearson_correlation)
+    pearson_correlations.append(pearson_correlation)
 
+print("Vector with pearson_correlations")
+print(pearson_correlations)
 
-# Calculate mean and std of each column
-mean_vector = trainset_x.mean(axis=0)     # to take the mean of each col
-std_vector = trainset_x.std(axis=0)     # to take the mean of each col
-# # For debugging purposes
-# print "Mean Vector"
-# print mean_vector
-# print "Std Vector"
-# print std_vector
 
 # normalize data - Z score normalization
 def normalize_zscore(x, mean_vector, std_vector):
     return (x - mean_vector) / std_vector
 
-# normalize data
-normal_trainset_x = normalize_zscore(trainset_x, mean_vector, std_vector)
+def normalize_zscore_columns(trainset_x):
+    # Calculate mean and std of each column
+    mean_vector = trainset_x.mean(axis=0)     # to take the mean of each col
+    std_vector = trainset_x.std(axis=0)     # to take the mean of each col
+    # # For debugging purposes
+    # print "Mean Vector"
+    # print mean_vector
+    # print "Std Vector"
+    # print std_vector
+
+    # normalize data
+    normal_trainset_x = normalize_zscore(trainset_x, mean_vector, std_vector)
+    return (normal_trainset_x, mean_vector, std_vector)
+
+(normal_trainset_x, mean_vector, std_vector) = normalize_zscore_columns(trainset_x)
 
 
 # np.savetxt('trainset_x.csv', trainset_x, delimiter=',')
@@ -149,16 +160,21 @@ def augment_x(unaugmented_x):
 augmented_normal_trainset_x = augment_x(normal_trainset_x)
 # # For debugging purposes
 # np.savetxt('augmented_x.csv', augmented_normal_trainset_x, delimiter=',')
+# np.savetxt('augmented_normal_trainset_x.csv', augmented_normal_trainset_x, delimiter=',')
 
 #---------------------------------------------------------------
 # We get w. This is how we train and obtain our linear regressor
 #---------------------------------------------------------------
-aug_w = np.dot(
-    np.linalg.pinv(
-        np.dot(augmented_normal_trainset_x.transpose(), augmented_normal_trainset_x)
-    ),
-    np.dot(augmented_normal_trainset_x.transpose(), trainset_y)
-)
+def find_w_param(augmented_normal_trainset_x, trainset_y):
+    aug_w = np.dot(
+        np.linalg.pinv(
+            np.dot(augmented_normal_trainset_x.transpose(), augmented_normal_trainset_x)
+        ),
+        np.dot(augmented_normal_trainset_x.transpose(), trainset_y)
+    )
+    return aug_w
+
+aug_w = find_w_param(augmented_normal_trainset_x, trainset_y)
 
 def linear_regression_prediction(aug_w, vector_x):
     predicted_y = np.inner(aug_w.transpose(), vector_x)
@@ -172,7 +188,7 @@ def find_MSE(aug_w, aug_x, y):
 
 # Use our trained algorithm to predict y and compare to the real y - find MSE
 mse_trainset = find_MSE(aug_w, augmented_normal_trainset_x, trainset_y)
-print "MSE training set: %f" %mse_trainset
+print "(Linear Regression) MSE training set: %f" %mse_trainset
 
 
 # For debugging purposes
@@ -198,22 +214,128 @@ augmented_normal_testset_x = augment_x(normal_testset_x)
 
 # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
 mse_testset = find_MSE(aug_w, augmented_normal_testset_x, testset_y)
-print "MSE testing set: %f" %mse_testset
+print "(Linear Regression) MSE testing set: %f" %mse_testset
 
 
 
 
 
-# # Now let's find the parameter and complete the same process for Ridge regression
-#
-# for param_lambda in [0.01, 0.1, 1.0]:
-#     #---------------------------------------------------------------
-#     # We get w. This is how we train and obtain our ridge regressor
-#     #---------------------------------------------------------------
-#     ridge_aug_w = np.dot(
-#         np.linalg.pinv(
-#             np.dot(augmented_normal_trainset_x.transpose(), augmented_normal_trainset_x) + param_lambda * np.identity()
-#         ),
-#         np.dot(augmented_normal_trainset_x.transpose(), trainset_y)
-#     )
+# Now let's find the parameter and complete the same process for Ridge regression
+
+for param_lambda in [0.01, 0.1, 1.0]:
+    #---------------------------------------------------------------
+    # We get w. This is how we train and obtain our ridge regressor
+    #---------------------------------------------------------------
+    ridge_aug_w = np.dot(
+        np.linalg.pinv(
+            np.dot(augmented_normal_trainset_x.transpose(), augmented_normal_trainset_x) +
+            param_lambda * np.identity(int(augmented_normal_trainset_x.shape[1]))
+        ),
+        np.dot(augmented_normal_trainset_x.transpose(), trainset_y)
+    )
+
+    # Use our trained algorithm to predict y and compare to the real y - find MSE
+    mse_trainset = find_MSE(ridge_aug_w, augmented_normal_trainset_x, trainset_y)
+    print "(Ridge Regression, lambda = %f) MSE training set: %f" % (param_lambda, mse_trainset)
+
+    # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+    mse_testset = find_MSE(ridge_aug_w, augmented_normal_testset_x, testset_y)
+    print "(Ridge Regression, lambda = %f) MSE testing set: %f" % (param_lambda, mse_testset)
+
+
+#---------------------------------------------------------------
+# TOP 4 FEATURES CORRELATED WITH TARGET
+#---------------------------------------------------------------
+# For debugging purposes
+print "Absolute values of Pearson correlations"
+abs_pearson_correlations = map(abs, pearson_correlations)
+print abs_pearson_correlations
+print "Sorted absolute values of Pearson correlations"
+print sorted(abs_pearson_correlations, reverse=True)
+print "TOP 4 attributes with highest correlations with target (attributes are counted from 0)"
+
+
+top_4_features = np.argsort(abs_pearson_correlations)[::-1][:4]
+# For debugging purposes
+print top_4_features
+
+
+columns_to_select = np.append(0, top_4_features + 1) # DON'T FORGET TO ADD THE FIRST COLUMN - WE NEED AN AUGMENTED X!!!!
+highest4_augmented_normal_trainset_x = augmented_normal_trainset_x[:, columns_to_select]
+# # For debugging purposes
+# np.savetxt('highest4_augmented_normal_trainset_x.csv', highest4_augmented_normal_trainset_x, delimiter=',')
+
+
+# TRAINING SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+highest4_aug_w = find_w_param(highest4_augmented_normal_trainset_x, trainset_y)
+mse_trainset = find_MSE(highest4_aug_w, highest4_augmented_normal_trainset_x, trainset_y)
+print "(Linear Regression, 4 features w/ highest correlation w/ target) MSE training set: %f" %mse_trainset
+
+# FOR TEST SET
+highest4_augmented_normal_testset_x = augmented_normal_testset_x[:, columns_to_select]
+# FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+mse_testset = find_MSE(highest4_aug_w, highest4_augmented_normal_testset_x, testset_y)
+print "(Linear Regression, 4 features w/ highest correlation w/ target) MSE testing set: %f" %mse_testset
+
+
+#---------------------------------------------------------------
+# ITERATIVE ADDING TOP FEATURE CORRELATED WITH RESIDUE
+#---------------------------------------------------------------
+def find_residue(aug_w, aug_x, y):
+    predicted_values_vector = linear_regression_prediction(aug_w, aug_x)
+    diff_v = predicted_values_vector - y
+    return diff_v
+
+def pearson_r_list(matrix_x, vector_y):
+    pearson_correlations = []
+    # Find Pearson correlation of each attr with target value
+    for attribute in range(matrix_x.shape[1]):
+        pearson_correlation = pearsonr(matrix_x[:, attribute], vector_y)
+        pearson_correlations.append(pearson_correlation)
+    return pearson_correlations
+
+
+top_features = []
+top_feature = np.argsort(abs_pearson_correlations)[::-1][0] + 1 #DON'T FORGET TO ADD 1: AUGMENTED X, COLUMN 0 IS VECTOR 1
+top_features.append(top_feature)
+print "top_feature %d" %top_feature
+columns_to_select = np.array([0]) # DON'T FORGET TO ADD THE FIRST COLUMN - WE NEED AN AUGMENTED X!!!!
+
+for i in range(4):
+    print "Adding feature %d" %(top_feature)
+    columns_to_select = np.append(columns_to_select, top_feature)
+    selected_aug_norm_x = augmented_normal_trainset_x[:, columns_to_select]
+
+    residue_trainset = find_residue(find_w_param(selected_aug_norm_x, trainset_y), selected_aug_norm_x, trainset_y)
+    # print "Residue:", residue_trainset
+    print "Residue shape:", residue_trainset.shape
+
+    residues_per_feature = map(abs, pearson_r_list(normal_trainset_x, residue_trainset))
+    print "this"
+    features_ordered_desc_residues = [attr for attr in np.argsort(residues_per_feature) if attr not in top_features][::-1]
+    top_feature = features_ordered_desc_residues[0] + 1 #DON'T FORGET TO ADD 1: AUGMENTED X, COLUMN 0 IS VECTOR 1
+    print "top_feature %d" %top_feature
+    print "columns_to_select", columns_to_select
+
+print "selected_aug_norm_x", selected_aug_norm_x
+
+# TRAINING SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+iterative_top4_aug_w = find_w_param(selected_aug_norm_x, trainset_y)
+mse_trainset = find_MSE(iterative_top4_aug_w, selected_aug_norm_x, trainset_y)
+print "(Linear Regression, iterative top 4 features [highest correlation w/ residue]) MSE training set: %f" %mse_trainset
+
+# FOR TEST SET
+iterative_top4_augmented_normal_testset_x = augmented_normal_testset_x[:, columns_to_select]
+# FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+mse_testset = find_MSE(iterative_top4_aug_w, iterative_top4_augmented_normal_testset_x, testset_y)
+print "(Linear Regression, iterative top 4 features [highest correlation w/ residue]) MSE testing set: %f" %mse_testset
+
+
+
+
+
+
+
+# # Polynomial Feature Expansion
+# squared_trainset_x =
 
