@@ -2,7 +2,7 @@ from sklearn.datasets import load_boston
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats.stats import pearsonr
-from itertools import imap
+from itertools import imap, combinations
 
 boston = load_boston()
 
@@ -136,6 +136,7 @@ def normalize_zscore_columns(trainset_x):
     normal_trainset_x = normalize_zscore(trainset_x, mean_vector, std_vector)
     return (normal_trainset_x, mean_vector, std_vector)
 
+# normalize data
 (normal_trainset_x, mean_vector, std_vector) = normalize_zscore_columns(trainset_x)
 
 
@@ -317,7 +318,8 @@ for i in range(4):
     print "top_feature %d" %top_feature
     print "columns_to_select", columns_to_select
 
-print "selected_aug_norm_x", selected_aug_norm_x
+# For debugging purposes
+# print "selected_aug_norm_x", selected_aug_norm_x
 
 # TRAINING SET: Use our trained algorithm to predict y and compare to the real y - find MSE
 iterative_top4_aug_w = find_w_param(selected_aug_norm_x, trainset_y)
@@ -331,11 +333,139 @@ mse_testset = find_MSE(iterative_top4_aug_w, iterative_top4_augmented_normal_tes
 print "(Linear Regression, iterative top 4 features [highest correlation w/ residue]) MSE testing set: %f" %mse_testset
 
 
+#---------------------------------------------------------------
+# Selection with Brute-force search
+#---------------------------------------------------------------
+
+
+
+
+#---------------------------------------------------------------
+# Polynomial Feature Expansion
+#---------------------------------------------------------------
+def expand_features(trainset_x):
+    # squared_trainset_x = np.square(trainset_x)
+    # print "squared_trainset_x.shape:", squared_trainset_x.shape
+    #     # np.dot(trainset_x.transpose(), )
+    # count = 0
+    expanded_trainset_x = np.empty([trainset_x.shape[0], 0])
+    # print expanded_trainset_x.shape
+    # np.hstack([np.array((int(), 1)), unaugmented_x])
+    #
+    for i in range(trainset_x.shape[1]):
+        for j in range(i, trainset_x.shape[1]):
+            # print (i, j)
+            # count += 1
+            new_column = np.multiply(trainset_x[:, i], trainset_x[:, j])
+            # print new_column
+            # print new_column.shape
+            expanded_trainset_x = np.column_stack((expanded_trainset_x, new_column))
+
+    # For debuggin purposes
+    # print count
+    # print "expanded_trainset_x", expanded_trainset_x
+    # print "expanded_trainset_x.shape", expanded_trainset_x.shape
+    return expanded_trainset_x
+
+# get new features
+expanded_trainset_x = expand_features(trainset_x)
+
+# normalize new features
+(expanded_normal_trainset_x, mean_vector_expanded_trainset_x, std_vector_expanded_trainset_x) = normalize_zscore_columns(expanded_trainset_x)
+
+# For debugging purposes
+# print "expanded_normal_trainset_x.mean", expanded_normal_trainset_x.mean(axis=0)
+# print "expanded_normal_trainset_x.std", expanded_normal_trainset_x.std(axis=0)
+# print "expanded_normal_trainset_x.mean", expanded_normal_trainset_x.mean(axis=0).shape
+# print "expanded_normal_trainset_x.std", expanded_normal_trainset_x.std(axis=0).shape
+
+# now add old features and new features together
+expanded_normal_trainset_x = np.column_stack((normal_trainset_x, expanded_normal_trainset_x))
+# print "expanded_trainset_x.shape:", expanded_trainset_x.shape
+
+# # For debugging purposes
+# print "expanded_normal_trainset_x.mean", expanded_normal_trainset_x.mean(axis=0)
+# print "expanded_normal_trainset_x.std", expanded_normal_trainset_x.std(axis=0)
+# print "expanded_normal_trainset_x.mean", expanded_normal_trainset_x.mean(axis=0).shape
+# print "expanded_normal_trainset_x.std", expanded_normal_trainset_x.std(axis=0).shape
+
+# Augment X with vector 1
+expanded_augmented_normal_trainset_x = augment_x(expanded_normal_trainset_x)
+# print "expanded_augmented_normal_trainset_x"
+# print expanded_augmented_normal_trainset_x[:, 0]
+
+expanded_aug_w = find_w_param(expanded_augmented_normal_trainset_x, trainset_y)
+# Use our trained algorithm to predict y and compare to the real y - find MSE
+mse_trainset = find_MSE(expanded_aug_w, expanded_augmented_normal_trainset_x, trainset_y)
+print "(Linear Regression, Polynomial Feature Expansion) MSE training set: %f" %mse_trainset
+
+# FOR TEST SET
+# get new features
+expanded_testset_x = expand_features(testset_x)
+# normalize new features
+expanded_normal_testset_x = normalize_zscore(expanded_testset_x, mean_vector_expanded_trainset_x, std_vector_expanded_trainset_x)
+# now add old features and new features together
+expanded_normal_testset_x = np.column_stack((normal_testset_x, expanded_normal_testset_x))
+# Augment X with vector 1
+expanded_augmented_normal_testset_x = augment_x(expanded_normal_testset_x)
+# FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+mse_testset = find_MSE(expanded_aug_w, expanded_augmented_normal_testset_x, testset_y)
+print "(Linear Regression, Polynomial Feature Expansion) MSE testing set: %f" %mse_testset
+
+
+
+#---------------------------------------------------------------
+# Selection with Brute-force search
+#---------------------------------------------------------------
+feature_combinations = list([[0] + # don't forget to add the augmentation column!
+                            # all possible combinations of attributes [1, 13]
+                             list(x) for x in combinations(range(1, augmented_normal_trainset_x.shape[1]),4)])
+# print feature_combinations
+# print len(tuple(combinations(range(normal_trainset_x.shape[1]),4)))
+
+for columns_to_select in feature_combinations:
+    selected_augmented_normal_trainset_x = augmented_normal_trainset_x[:, columns_to_select]
+    # For debugging purposes
+    # print selected_augmented_normal_trainset_x.shape
+    # print str(columns_to_select)
+    # np.savetxt('selected_augmented_normal_trainset_x.csv', selected_augmented_normal_trainset_x, delimiter=',')
+    #
+    #
+    # TRAINING SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+    selected_aug_w = find_w_param(selected_augmented_normal_trainset_x, trainset_y)
+    mse_trainset = find_MSE(selected_aug_w, selected_augmented_normal_trainset_x, trainset_y)
+    # print "(Linear Regression, brute force) MSE training set: %f" % mse_trainset
+
+    # FOR TEST SET
+    selected_augmented_normal_testset_x = augmented_normal_testset_x[:, columns_to_select]
+    # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+    mse_testset = find_MSE(selected_aug_w, selected_augmented_normal_testset_x, testset_y)
+    # print "(Linear Regression, brute force) MSE testing set: %f" % mse_testset
 
 
 
 
 
-# # Polynomial Feature Expansion
-# squared_trainset_x =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
