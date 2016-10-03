@@ -76,6 +76,14 @@ for i in range(len(boston.data)):
 # np.savetxt('output_file.csv', trainset_x, delimiter=',')   # X is an array
 
 
+# #---------------------------------------------------------------
+# # Histogram plotting
+# #---------------------------------------------------------------
+# print("""\n
+# #---------------------------------------------------------------
+# # Plotting histograms...
+# #---------------------------------------------------------------
+# """)
 # # Plot histogram for attributes
 # for attribute in range(trainset_x.shape[1]):
 #     plt.hist(trainset_x[:, attribute], bins=10)
@@ -84,7 +92,18 @@ for i in range(len(boston.data)):
 #
 # plt.hist(trainset_y, bins=10)
 # plt.title("Histogram for attribute 14 (target)")
+# plt.xlabel('Attribute values')
+# plt.ylabel('Frequency')
 # plt.show()
+
+#---------------------------------------------------------------
+# Pearson Correlations
+#---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# Pearson Correlations
+#---------------------------------------------------------------
+""")
 
 # # Pearson correlation with numpy - Not allowed :(
 # for attribute in range(trainset_x.shape[1]):
@@ -117,6 +136,15 @@ for attribute in range(trainset_x.shape[1]):
 print("Vector with pearson_correlations")
 print(pearson_correlations)
 
+
+#---------------------------------------------------------------
+# Linear Regression
+#---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# Linear Regression
+#---------------------------------------------------------------
+""")
 
 # normalize data - Z score normalization
 def normalize_zscore(x, mean_vector, std_vector):
@@ -219,7 +247,14 @@ print "(Linear Regression) MSE testing set: %f" %mse_testset
 
 
 
-
+#---------------------------------------------------------------
+# Ridge Regression
+#---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# Ridge Regression
+#---------------------------------------------------------------
+""")
 
 # Now let's find the parameter and complete the same process for Ridge regression
 
@@ -244,18 +279,36 @@ for param_lambda in [0.01, 0.1, 1.0]:
     print "(Ridge Regression, lambda = %f) MSE testing set: %f" % (param_lambda, mse_testset)
 
 
+# #---------------------------------------------------------------
+# # Ridge Regression with Cross-Validation
+# #---------------------------------------------------------------
+# print("""\n
+# #---------------------------------------------------------------
+# # Ridge Regression with Cross-Validation
+# #---------------------------------------------------------------
+# """)
+# for hyperparam_lambda in [0.0001, 0.001, 0.01, 0.1, 1.0]:
+#     print hyperparam_lambda
+
+
+
+
 #---------------------------------------------------------------
 # TOP 4 FEATURES CORRELATED WITH TARGET
 #---------------------------------------------------------------
-# For debugging purposes
-print "Absolute values of Pearson correlations"
+print("""\n
+#---------------------------------------------------------------
+# TOP 4 FEATURES CORRELATED WITH TARGET
+#---------------------------------------------------------------
+""")
 abs_pearson_correlations = map(abs, pearson_correlations)
-print abs_pearson_correlations
-print "Sorted absolute values of Pearson correlations"
-print sorted(abs_pearson_correlations, reverse=True)
+
+# For debugging purposes
+# print "Absolute values of Pearson correlations"
+# print abs_pearson_correlations
+# print "Sorted absolute values of Pearson correlations"
+# print sorted(abs_pearson_correlations, reverse=True)
 print "TOP 4 attributes with highest correlations with target (attributes are counted from 0)"
-
-
 top_4_features = np.argsort(abs_pearson_correlations)[::-1][:4]
 # For debugging purposes
 print top_4_features
@@ -282,6 +335,12 @@ print "(Linear Regression, 4 features w/ highest correlation w/ target) MSE test
 #---------------------------------------------------------------
 # ITERATIVE ADDING TOP FEATURE CORRELATED WITH RESIDUE
 #---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# ITERATIVE ADDING TOP FEATURE CORRELATED WITH RESIDUE
+#---------------------------------------------------------------
+""")
+
 def find_residue(aug_w, aug_x, y):
     predicted_values_vector = linear_regression_prediction(aug_w, aug_x)
     diff_v = predicted_values_vector - y
@@ -299,7 +358,7 @@ def pearson_r_list(matrix_x, vector_y):
 top_features = []
 top_feature = np.argsort(abs_pearson_correlations)[::-1][0] + 1 #DON'T FORGET TO ADD 1: AUGMENTED X, COLUMN 0 IS VECTOR 1
 top_features.append(top_feature)
-print "top_feature %d" %top_feature
+# print "top_feature %d" %top_feature
 columns_to_select = np.array([0]) # DON'T FORGET TO ADD THE FIRST COLUMN - WE NEED AN AUGMENTED X!!!!
 
 for i in range(4):
@@ -309,14 +368,17 @@ for i in range(4):
 
     residue_trainset = find_residue(find_w_param(selected_aug_norm_x, trainset_y), selected_aug_norm_x, trainset_y)
     # print "Residue:", residue_trainset
-    print "Residue shape:", residue_trainset.shape
+    # print "Residue shape:", residue_trainset.shape
 
     residues_per_feature = map(abs, pearson_r_list(normal_trainset_x, residue_trainset))
-    print "this"
     features_ordered_desc_residues = [attr for attr in np.argsort(residues_per_feature) if attr not in top_features][::-1]
     top_feature = features_ordered_desc_residues[0] + 1 #DON'T FORGET TO ADD 1: AUGMENTED X, COLUMN 0 IS VECTOR 1
-    print "top_feature %d" %top_feature
+    # print "top_feature %d" %top_feature
+
+    # For debugging purposes
     print "columns_to_select", columns_to_select
+
+print "Attributes seleected", columns_to_select[1:]
 
 # For debugging purposes
 # print "selected_aug_norm_x", selected_aug_norm_x
@@ -336,6 +398,49 @@ print "(Linear Regression, iterative top 4 features [highest correlation w/ resi
 #---------------------------------------------------------------
 # Selection with Brute-force search
 #---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# Selection with Brute-force search
+#---------------------------------------------------------------
+""")
+feature_combinations = list([[0] + # don't forget to add the augmentation column!
+                            # all possible combinations of attributes [1, 13]
+                             list(x) for x in combinations(range(1, augmented_normal_trainset_x.shape[1]),4)])
+# print feature_combinations
+# print len(tuple(combinations(range(normal_trainset_x.shape[1]),4)))
+best_features_combination = feature_combinations[0]
+mse_trainset_best_combination = mse_testset_best_combination = np.inner(testset_y.transpose(), testset_y) #some really big number as initial value for MSE
+# For debugging purposes
+# print "initial mse_trainset_best_combination: ", mse_trainset_best_combination
+# print "initial mse_testset_best_combination: ", mse_testset_best_combination
+
+for columns_to_select in feature_combinations:
+    selected_augmented_normal_trainset_x = augmented_normal_trainset_x[:, columns_to_select]
+    # For debugging purposes
+    # print selected_augmented_normal_trainset_x.shape
+    # print str(columns_to_select)
+    # np.savetxt('selected_augmented_normal_trainset_x.csv', selected_augmented_normal_trainset_x, delimiter=',')
+    #
+    #
+    # TRAINING SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+    selected_aug_w = find_w_param(selected_augmented_normal_trainset_x, trainset_y)
+    mse_trainset = find_MSE(selected_aug_w, selected_augmented_normal_trainset_x, trainset_y)
+    # print "(Linear Regression, brute force) MSE training set: %f" % mse_trainset
+
+    # FOR TEST SET
+    selected_augmented_normal_testset_x = augmented_normal_testset_x[:, columns_to_select]
+    # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+    mse_testset = find_MSE(selected_aug_w, selected_augmented_normal_testset_x, testset_y)
+    # print "(Linear Regression, brute force) MSE testing set: %f" % mse_testset
+
+    if mse_testset < mse_testset_best_combination:
+        mse_trainset_best_combination = mse_trainset
+        mse_testset_best_combination = mse_testset
+        best_features_combination = columns_to_select[1:]
+
+print "Best combination of features: ", best_features_combination
+print "(Linear Regression, Brute-force search, Best combination of features) MSE training set: %f" %mse_trainset_best_combination
+print "(Linear Regression, Brute-force search, Best combination of features) MSE testing set: %f" %mse_testset_best_combination
 
 
 
@@ -343,6 +448,12 @@ print "(Linear Regression, iterative top 4 features [highest correlation w/ resi
 #---------------------------------------------------------------
 # Polynomial Feature Expansion
 #---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# Polynomial Feature Expansion
+#---------------------------------------------------------------
+""")
+
 def expand_features(trainset_x):
     # squared_trainset_x = np.square(trainset_x)
     # print "squared_trainset_x.shape:", squared_trainset_x.shape
@@ -411,72 +522,6 @@ expanded_augmented_normal_testset_x = augment_x(expanded_normal_testset_x)
 # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
 mse_testset = find_MSE(expanded_aug_w, expanded_augmented_normal_testset_x, testset_y)
 print "(Linear Regression, Polynomial Feature Expansion) MSE testing set: %f" %mse_testset
-
-
-
-#---------------------------------------------------------------
-# Selection with Brute-force search
-#---------------------------------------------------------------
-feature_combinations = list([[0] + # don't forget to add the augmentation column!
-                            # all possible combinations of attributes [1, 13]
-                             list(x) for x in combinations(range(1, augmented_normal_trainset_x.shape[1]),4)])
-# print feature_combinations
-# print len(tuple(combinations(range(normal_trainset_x.shape[1]),4)))
-best_features_combination = feature_combinations[0]
-mse_trainset_best_combination = mse_testset_best_combination = np.inner(testset_y.transpose(), testset_y) #some really big number as initial value for MSE
-# For debugging purposes
-print "initial mse_trainset_best_combination: ", mse_trainset_best_combination
-print "initial mse_testset_best_combination: ", mse_testset_best_combination
-
-for columns_to_select in feature_combinations:
-    selected_augmented_normal_trainset_x = augmented_normal_trainset_x[:, columns_to_select]
-    # For debugging purposes
-    # print selected_augmented_normal_trainset_x.shape
-    # print str(columns_to_select)
-    # np.savetxt('selected_augmented_normal_trainset_x.csv', selected_augmented_normal_trainset_x, delimiter=',')
-    #
-    #
-    # TRAINING SET: Use our trained algorithm to predict y and compare to the real y - find MSE
-    selected_aug_w = find_w_param(selected_augmented_normal_trainset_x, trainset_y)
-    mse_trainset = find_MSE(selected_aug_w, selected_augmented_normal_trainset_x, trainset_y)
-    # print "(Linear Regression, brute force) MSE training set: %f" % mse_trainset
-
-    # FOR TEST SET
-    selected_augmented_normal_testset_x = augmented_normal_testset_x[:, columns_to_select]
-    # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
-    mse_testset = find_MSE(selected_aug_w, selected_augmented_normal_testset_x, testset_y)
-    # print "(Linear Regression, brute force) MSE testing set: %f" % mse_testset
-
-    if mse_testset < mse_testset_best_combination:
-        mse_trainset_best_combination = mse_trainset
-        mse_testset_best_combination = mse_testset
-        best_features_combination = columns_to_select[1:]
-
-print "Best combination of features: ", best_features_combination
-print "(Linear Regression, Brute-force search, Best combination of features) MSE training set: %f" %mse_trainset_best_combination
-print "(Linear Regression, Brute-force search, Best combination of features) MSE testing set: %f" %mse_testset_best_combination
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
