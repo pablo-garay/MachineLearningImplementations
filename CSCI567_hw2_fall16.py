@@ -422,6 +422,11 @@ feature_combinations = list([[0] + # don't forget to add the augmentation column
                              list(x) for x in combinations(range(1, augmented_normal_trainset_x.shape[1]),4)])
 # print feature_combinations
 # print len(tuple(combinations(range(normal_trainset_x.shape[1]),4)))
+best_features_combination = feature_combinations[0]
+mse_trainset_best_combination = mse_testset_best_combination = np.inner(testset_y.transpose(), testset_y) #some really big number as initial value for MSE
+# For debugging purposes
+print "initial mse_trainset_best_combination: ", mse_trainset_best_combination
+print "initial mse_testset_best_combination: ", mse_testset_best_combination
 
 for columns_to_select in feature_combinations:
     selected_augmented_normal_trainset_x = augmented_normal_trainset_x[:, columns_to_select]
@@ -442,6 +447,14 @@ for columns_to_select in feature_combinations:
     mse_testset = find_MSE(selected_aug_w, selected_augmented_normal_testset_x, testset_y)
     # print "(Linear Regression, brute force) MSE testing set: %f" % mse_testset
 
+    if mse_testset < mse_testset_best_combination:
+        mse_trainset_best_combination = mse_trainset
+        mse_testset_best_combination = mse_testset
+        best_features_combination = columns_to_select[1:]
+
+print "Best combination of features: ", best_features_combination
+print "(Linear Regression, Brute-force search, Best combination of features) MSE training set: %f" %mse_trainset_best_combination
+print "(Linear Regression, Brute-force search, Best combination of features) MSE testing set: %f" %mse_testset_best_combination
 
 
 
