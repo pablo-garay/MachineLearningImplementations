@@ -257,11 +257,7 @@ print("""\n
 """)
 
 # Now let's find the parameter and complete the same process for Ridge regression
-
-for param_lambda in [0.01, 0.1, 1.0]:
-    #---------------------------------------------------------------
-    # We get w. This is how we train and obtain our ridge regressor
-    #---------------------------------------------------------------
+def ridge_find_w_param(augmented_normal_trainset_x, param_lambda, trainset_y):
     ridge_aug_w = np.dot(
         np.linalg.pinv(
             np.dot(augmented_normal_trainset_x.transpose(), augmented_normal_trainset_x) +
@@ -269,6 +265,13 @@ for param_lambda in [0.01, 0.1, 1.0]:
         ),
         np.dot(augmented_normal_trainset_x.transpose(), trainset_y)
     )
+    return ridge_aug_w
+
+def ridge_regression_report_results(augmented_normal_trainset_x, param_lambda, trainset_y, augmented_normal_testset_x, testset_y):
+    #---------------------------------------------------------------
+    # We get w. This is how we train and obtain our ridge regressor
+    #---------------------------------------------------------------
+    ridge_aug_w = ridge_find_w_param(augmented_normal_trainset_x, param_lambda, trainset_y)
 
     # Use our trained algorithm to predict y and compare to the real y - find MSE
     mse_trainset = find_MSE(ridge_aug_w, augmented_normal_trainset_x, trainset_y)
@@ -279,16 +282,107 @@ for param_lambda in [0.01, 0.1, 1.0]:
     print "(Ridge Regression, lambda = %f) MSE testing set: %f" % (param_lambda, mse_testset)
 
 
-# #---------------------------------------------------------------
-# # Ridge Regression with Cross-Validation
-# #---------------------------------------------------------------
-# print("""\n
-# #---------------------------------------------------------------
-# # Ridge Regression with Cross-Validation
-# #---------------------------------------------------------------
-# """)
-# for hyperparam_lambda in [0.0001, 0.001, 0.01, 0.1, 1.0]:
-#     print hyperparam_lambda
+for param_lambda in [0.01, 0.1, 1.0]:
+    ridge_regression_report_results(augmented_normal_trainset_x, param_lambda, trainset_y, augmented_normal_testset_x, testset_y)
+
+
+
+#---------------------------------------------------------------
+# Ridge Regression with Cross-Validation
+#---------------------------------------------------------------
+print("""\n
+#---------------------------------------------------------------
+# Ridge Regression with Cross-Validation
+#---------------------------------------------------------------
+""")
+# print augmented_normal_trainset_x.shape
+# print trainset_y.shape
+
+joint = np.column_stack((augmented_normal_trainset_x, trainset_y))
+# print joint
+# print trainset_y
+# print joint.shape
+
+permuted = np.random.permutation(joint)
+# print "permuted", permuted
+# print permuted.shape
+
+train_x = permuted[:,:-1]
+train_y = permuted[:,train_x.shape[1]]
+# print "train_x.shape: ", train_x.shape
+# print "train_y.shape: ", train_y.shape
+# print train_x.shape[1]
+# print train_y
+
+num_partitions = 10
+arrays_train_x = np.array_split(train_x, num_partitions, axis=0)
+arrays_train_y = np.array_split(train_y, num_partitions, axis=0)
+
+# print "arrays_train_x"
+# print arrays_train_x
+# print "arrays_train_y"
+# print arrays_train_y
+
+# For debugging purposes
+# print "x shapes"
+# for x in arrays_train_x:
+#     print x.shape
+#
+# print "y shapes"
+# for y in arrays_train_y:
+#     print y.shape
+#
+# print "len(arrays_train_x)", len(arrays_train_x)
+# print "len(arrays_train_y)", len(arrays_train_y)
+
+best_average_performance = np.inner(boston.target.transpose(), boston.target)
+best_lambda = 0
+# print "initial value of best_average_performance: ", best_average_performance
+
+for hyperparam_lambda in [0.0001, 0.001, 0.01, 0.1, 1.0]:
+    # for each lambda, we repeat the process
+    mse_train = []
+    mse_test = []
+    joint_parts_x = hold_out_x = np.empty( shape=(0, 0) )
+    joint_parts_y = hold_out_y = np.empty( shape=(0) )
+
+    for partition_num in range(num_partitions):
+        list_excluding_partition = [num for num in range(num_partitions) if num != partition_num]
+        # print "partition_num", partition_num
+        # print "list_excluding_partition", list_excluding_partition
+
+        joint_parts_x = np.vstack((tuple([arrays_train_x[i] for i in list_excluding_partition])))
+        joint_parts_y = np.concatenate((tuple([arrays_train_y[i] for i in list_excluding_partition])))
+        # print "joint_parts_x.shape", joint_parts_x.shape
+        # print "joint_parts_y.shape", joint_parts_y.shape
+
+        hold_out_x = arrays_train_x[partition_num]
+        hold_out_y = arrays_train_y[partition_num]
+        # print "hold_out_x.shape", hold_out_x.shape
+        # print "hold_out_y.shape", hold_out_y.shape
+
+
+        ridge_aug_w = ridge_find_w_param(joint_parts_x, hyperparam_lambda, joint_parts_y)
+
+        # Use our trained algorithm to predict y and compare to the real y - find MSE
+        mse_train.append(find_MSE(ridge_aug_w, joint_parts_x, joint_parts_y))
+        # print "%d (Ridge Regression, lambda = %f) MSE training set: " % (partition_num, hyperparam_lambda), mse_train
+
+        # FOR TEST SET: Use our trained algorithm to predict y and compare to the real y - find MSE
+        mse_test.append(find_MSE(ridge_aug_w, hold_out_x, hold_out_y))
+        # print "%d (Ridge Regression, lambda = %f) MSE testing set: " % (partition_num, hyperparam_lambda), mse_test
+
+    average_performance = sum(mse_test)/len(mse_test)
+    print "(10-fold cross-validation) AVG MSE on test set for lambda=%f: %f" %(hyperparam_lambda, average_performance)
+
+    if average_performance < best_average_performance:
+        best_average_performance = average_performance
+        best_lambda = hyperparam_lambda
+
+print "Best lambda: %f \t 10-fold cross-validation MSE: %f" %(best_lambda, best_average_performance)
+
+print """\nNow that we have the best lambda, compute the MSE on the testing set"""
+ridge_regression_report_results(augmented_normal_trainset_x, best_lambda, trainset_y, augmented_normal_testset_x, testset_y)
 
 
 
@@ -409,7 +503,7 @@ feature_combinations = list([[0] + # don't forget to add the augmentation column
 # print feature_combinations
 # print len(tuple(combinations(range(normal_trainset_x.shape[1]),4)))
 best_features_combination = feature_combinations[0]
-mse_trainset_best_combination = mse_testset_best_combination = np.inner(testset_y.transpose(), testset_y) #some really big number as initial value for MSE
+mse_trainset_best_combination = mse_testset_best_combination = np.inner(boston.target.transpose(), boston.target) #some really big number as initial value for MSE
 # For debugging purposes
 # print "initial mse_trainset_best_combination: ", mse_trainset_best_combination
 # print "initial mse_testset_best_combination: ", mse_testset_best_combination
